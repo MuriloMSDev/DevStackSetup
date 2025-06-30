@@ -724,19 +724,6 @@ switch ($Command) {
     }    
     "gui" {
         Write-Log "Comando executado: gui"
-        # Instala a fonte MesloLGS NF (Powerline) se não estiver instalada
-        $mesloFontName = "MesloLGS NF"
-        $fontInstalled = Get-ChildItem -Path "C:\Windows\Fonts" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "^MesloLGS.*Nerd.*\.ttf$" -or $_.Name -match "^MesloLGS NF.*\.ttf$" }
-        $fontInstalled = $fontInstalled.Count -gt 0
-        if (-not $fontInstalled) {
-            Write-Host "Instalando a fonte MesloLGS NF (Powerline) via winget..." -ForegroundColor Yellow
-            try {
-                winget install --id NerdFonts.Meslo --accept-package-agreements --accept-source-agreements -e
-                Write-Host "Fonte MesloLGS NF instalada com sucesso." -ForegroundColor Green
-            } catch {
-                Write-Host "Não foi possível instalar a fonte MesloLGS NF automaticamente. Instale manualmente se necessário." -ForegroundColor Red
-            }
-        }
         # Inicia a GUI do DevStack
         try {
             if ($Args.Count -gt 0 -and $Args[0] -and $Args[0].ToLower() -eq "--isnew") {
