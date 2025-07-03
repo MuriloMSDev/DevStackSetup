@@ -1,6 +1,6 @@
-# DevStackSetup
+# DevStackManager
 
-![DevStackSetup Banner](https://img.shields.io/badge/PowerShell-DevStack-blue?style=for-the-badge&logo=powershell)
+![DevStackManager Banner](https://img.shields.io/badge/PowerShell-DevStack-blue?style=for-the-badge&logo=powershell)
 
 > **Ambiente de desenvolvimento local completo para Windows, com um só comando.**
 
@@ -16,7 +16,7 @@ Scripts PowerShell para instalar, gerenciar e remover rapidamente um ambiente de
 Abra um terminal **PowerShell como administrador** e execute:
 
 ```powershell
-# Torne o DevStackSetup global (execute uma vez):
+# Torne o DevStackManager global (execute uma vez):
 ./setup.ps1 global
 # Após isso, use 'devstack' ou 'setup.ps1' de qualquer pasta no terminal!
 ```
@@ -75,7 +75,7 @@ Abra um terminal **PowerShell como administrador** e execute:
 ## 📂 Estrutura do Projeto
 
 ```
-DevStackSetup/
+DevStackManager/
 │   setup.ps1
 │   README.md
 │
