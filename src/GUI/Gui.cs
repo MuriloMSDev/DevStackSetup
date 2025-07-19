@@ -35,7 +35,30 @@ namespace DevStackManager
         private string _selectedUninstallComponent = "";
         private string _selectedUninstallVersion = "";
         private string _consoleOutput = "";
-        private bool _isLoading = false;
+        private bool _isInstallingComponent = false;
+        private bool _isUninstallingComponent = false;
+        private bool _isLoadingServices = false;
+        private bool _isCreatingSite = false;
+        public bool IsInstallingComponent
+        {
+            get => _isInstallingComponent;
+            set { _isInstallingComponent = value; OnPropertyChanged(); }
+        }
+        public bool IsUninstallingComponent
+        {
+            get => _isUninstallingComponent;
+            set { _isUninstallingComponent = value; OnPropertyChanged(); }
+        }
+        public bool IsLoadingServices
+        {
+            get => _isLoadingServices;
+            set { _isLoadingServices = value; OnPropertyChanged(); }
+        }
+        public bool IsCreatingSite
+        {
+            get => _isCreatingSite;
+            set { _isCreatingSite = value; OnPropertyChanged(); }
+        }
         public ContentControl? _mainContent;
         private int _selectedNavIndex = 0;
         private static GuiTheme.ThemeColors CurrentTheme => GuiTheme.DarkTheme;
@@ -101,22 +124,13 @@ namespace DevStackManager
             get => _consoleOutput;
             set { _consoleOutput = value; OnPropertyChanged(); }
         }
-
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set { _isLoading = value; OnPropertyChanged(); }
-        }
         
         public int SelectedNavIndex
         {
             get => _selectedNavIndex;
             set { 
                 _selectedNavIndex = value; 
-                OnPropertyChanged(); 
-                
-                // Limpar console ao trocar de aba
-                GuiConsolePanel.ClearConsole(this);
+                OnPropertyChanged();
 
                 GuiNavigation.NavigateToSection(this, value);
             }

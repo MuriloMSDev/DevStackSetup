@@ -42,6 +42,8 @@ namespace DevStackManager
     /// </summary>
     public static class GuiServicesTab
     {
+        // Overlays de loading usados apenas nesta tab
+        private static Border? ServicesLoadingOverlay;
         /// <summary>
         /// Cria o conteúdo completo da aba "Serviços"
         /// </summary>
@@ -66,6 +68,23 @@ namespace DevStackManager
             var controlPanel = CreateServicesControlPanel(mainWindow);
             Grid.SetRow(controlPanel, 2);
             grid.Children.Add(controlPanel);
+
+
+            // Overlay de loading único cobrindo toda a área de serviços
+            var overlay = GuiTheme.CreateLoadingOverlay();
+            // Overlay sempre visível se carregando serviços
+            overlay.Visibility = mainWindow.IsLoadingServices ? Visibility.Visible : Visibility.Collapsed;
+            mainWindow.PropertyChanged += (sender, args) =>
+            {
+                if (args.PropertyName == nameof(mainWindow.IsLoadingServices))
+                {
+                    overlay.Visibility = mainWindow.IsLoadingServices ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
+            Grid.SetRowSpan(overlay, 3);
+            grid.Children.Add(overlay);
+            ServicesLoadingOverlay = overlay;
 
             return grid;
         }
@@ -298,7 +317,7 @@ namespace DevStackManager
                     }
                     else
                     {
-                        MessageBox.Show("Serviço não está em execução, não há PID para copiar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        GuiTheme.CreateStyledMessageBox("Serviço não está em execução, não há PID para copiar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
             }
@@ -406,19 +425,49 @@ namespace DevStackManager
             };
 
             // Botões para todos os serviços
-            var startAllButton = GuiTheme.CreateStyledButton("▶️ Iniciar Todos", async (s, e) => await StartAllServices(mainWindow));
+            var startAllButton = GuiTheme.CreateStyledButton("▶️ Iniciar Todos", async (s, e) =>
+            {
+                mainWindow.IsLoadingServices = true;
+                if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Visible;
+                try { await StartAllServices(mainWindow); }
+                finally
+                {
+                    mainWindow.IsLoadingServices = false;
+                    if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Collapsed;
+                }
+            });
             startAllButton.Width = 140;
             startAllButton.Height = 40;
             startAllButton.Margin = new Thickness(10);
             panel.Children.Add(startAllButton);
 
-            var stopAllButton = GuiTheme.CreateStyledButton("⏹️ Parar Todos", async (s, e) => await StopAllServices(mainWindow));
+            var stopAllButton = GuiTheme.CreateStyledButton("⏹️ Parar Todos", async (s, e) =>
+            {
+                mainWindow.IsLoadingServices = true;
+                if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Visible;
+                try { await StopAllServices(mainWindow); }
+                finally
+                {
+                    mainWindow.IsLoadingServices = false;
+                    if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Collapsed;
+                }
+            });
             stopAllButton.Width = 140;
             stopAllButton.Height = 40;
             stopAllButton.Margin = new Thickness(10);
             panel.Children.Add(stopAllButton);
 
-            var restartAllButton = GuiTheme.CreateStyledButton("🔄 Reiniciar Todos", async (s, e) => await RestartAllServices(mainWindow));
+            var restartAllButton = GuiTheme.CreateStyledButton("🔄 Reiniciar Todos", async (s, e) =>
+            {
+                mainWindow.IsLoadingServices = true;
+                if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Visible;
+                try { await RestartAllServices(mainWindow); }
+                finally
+                {
+                    mainWindow.IsLoadingServices = false;
+                    if (ServicesLoadingOverlay != null) ServicesLoadingOverlay.Visibility = Visibility.Collapsed;
+                }
+            });
             restartAllButton.Width = 140;
             restartAllButton.Height = 40;
             restartAllButton.Margin = new Thickness(10);

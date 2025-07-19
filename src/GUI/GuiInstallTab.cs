@@ -20,7 +20,7 @@ namespace DevStackManager
         {
             // Carregar componentes disponíveis
             LoadAvailableComponents(mainWindow);
-            
+
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -41,8 +41,10 @@ namespace DevStackManager
         /// <summary>
         /// Cria o painel de seleção de componentes para instalação
         /// </summary>
-        private static StackPanel CreateInstallSelectionPanel(DevStackGui mainWindow)
+        private static UIElement CreateInstallSelectionPanel(DevStackGui mainWindow)
         {
+            // Usar Grid para permitir overlay
+            var grid = new Grid();
             var panel = new StackPanel
             {
                 Margin = new Thickness(10)
@@ -80,8 +82,33 @@ namespace DevStackManager
             versionCombo.SetBinding(ComboBox.SelectedValueProperty, selectedVersionBinding);
             panel.Children.Add(versionCombo);
 
+            // Overlay de loading (spinner)
+            var overlay = GuiTheme.CreateLoadingOverlay();
+            // Overlay sempre visível se instalando
+            overlay.Visibility = mainWindow.IsInstallingComponent ? Visibility.Visible : Visibility.Collapsed;
+            mainWindow.PropertyChanged += (sender, args) =>
+            {
+                if (args.PropertyName == nameof(mainWindow.IsInstallingComponent))
+                {
+                    overlay.Visibility = mainWindow.IsInstallingComponent ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
             // Botão Instalar
-            var installButton = GuiTheme.CreateStyledButton("📥 Instalar", async (s, e) => await InstallComponent(mainWindow));
+            var installButton = GuiTheme.CreateStyledButton("📥 Instalar", async (s, e) =>
+            {
+                mainWindow.IsInstallingComponent = true;
+                overlay.Visibility = Visibility.Visible;
+                try
+                {
+                    await InstallComponent(mainWindow);
+                }
+                finally
+                {
+                    mainWindow.IsInstallingComponent = false;
+                    overlay.Visibility = Visibility.Collapsed;
+                }
+            });
             installButton.Height = 40;
             installButton.FontSize = 14;
             installButton.Margin = new Thickness(0, 10, 0, 0);
@@ -93,7 +120,11 @@ namespace DevStackManager
             listVersionsButton.Margin = new Thickness(0, 10, 0, 0);
             panel.Children.Add(listVersionsButton);
 
-            return panel;
+            // Adiciona painel e overlay ao grid
+            grid.Children.Add(panel);
+            grid.Children.Add(overlay);
+
+            return grid;
         }
 
         /// <summary>
@@ -103,21 +134,20 @@ namespace DevStackManager
         {
             if (string.IsNullOrEmpty(mainWindow.SelectedComponent))
             {
-                MessageBox.Show("Selecione um componente para instalar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                GuiTheme.CreateStyledMessageBox("Selecione um componente para instalar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            mainWindow.IsLoading = true;
             mainWindow.StatusMessage = $"Instalando {mainWindow.SelectedComponent}...";
-            
+
             try
             {
-                var args = string.IsNullOrEmpty(mainWindow.SelectedVersion) 
+                var args = string.IsNullOrEmpty(mainWindow.SelectedVersion)
                     ? new[] { mainWindow.SelectedComponent }
                     : new[] { mainWindow.SelectedComponent, mainWindow.SelectedVersion };
-                
+
                 await InstallManager.InstallCommands(args);
-                
+
                 // Atualizar PATH após instalação bem-sucedida
                 if (DevStackConfig.pathManager != null)
                 {
@@ -127,9 +157,9 @@ namespace DevStackManager
                 {
                     GuiConsolePanel.AppendToConsole(mainWindow, "⚠️ PathManager não foi inicializado - PATH não foi atualizado");
                 }
-                
+
                 mainWindow.StatusMessage = $"{mainWindow.SelectedComponent} instalado com sucesso!";
-                
+
                 // Recarregar lista de instalados
                 await GuiInstalledTab.LoadInstalledComponents(mainWindow);
             }
@@ -138,10 +168,6 @@ namespace DevStackManager
                 GuiConsolePanel.AppendToConsole(mainWindow, $"❌ Erro ao instalar {mainWindow.SelectedComponent}: {ex.Message}");
                 mainWindow.StatusMessage = $"Erro ao instalar {mainWindow.SelectedComponent}";
                 DevStackConfig.WriteLog($"Erro ao instalar {mainWindow.SelectedComponent} na GUI: {ex}");
-            }
-            finally
-            {
-                mainWindow.IsLoading = false;
             }
         }
 
@@ -152,16 +178,16 @@ namespace DevStackManager
         {
             if (string.IsNullOrEmpty(mainWindow.SelectedComponent))
             {
-                MessageBox.Show("Selecione um componente primeiro.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                GuiTheme.CreateStyledMessageBox("Selecione um componente primeiro.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             mainWindow.StatusMessage = $"Listando versões de {mainWindow.SelectedComponent}...";
-            
+
             try
             {
                 ListManager.ListVersions(mainWindow.SelectedComponent);
-                
+
                 mainWindow.StatusMessage = $"Versões de {mainWindow.SelectedComponent} listadas";
             }
             catch (Exception ex)
@@ -187,19 +213,19 @@ namespace DevStackManager
                 try
                 {
                     mainWindow.StatusMessage = $"Carregando versões de {mainWindow.SelectedComponent}...";
-                    
+
                     var versionData = GetVersionDataForComponent(mainWindow.SelectedComponent);
-                    
+
                     mainWindow.Dispatcher.Invoke(() =>
                     {
                         mainWindow.AvailableVersions.Clear();
                         foreach (var version in versionData.Versions
-                            .OrderByDescending(v => 
+                            .OrderByDescending(v =>
                                 Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0)))
                         {
                             mainWindow.AvailableVersions.Add(version);
                         }
-                        
+
                         mainWindow.StatusMessage = $"{mainWindow.AvailableVersions.Count} versões carregadas para {mainWindow.SelectedComponent}";
                     });
                 }

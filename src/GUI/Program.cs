@@ -36,9 +36,9 @@ namespace DevStackManager
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erro ao inicializar DevStack GUI: {ex.Message}", 
-                              "DevStack Manager - Erro", 
-                              MessageBoxButton.OK, 
+                GuiTheme.CreateStyledMessageBox($"Erro ao inicializar DevStack GUI: {ex.Message}",
+                              "DevStack Manager - Erro",
+                              MessageBoxButton.OK,
                               MessageBoxImage.Error);
                 return 1;
             }

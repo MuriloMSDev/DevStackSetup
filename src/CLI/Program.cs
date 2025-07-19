@@ -576,31 +576,52 @@ namespace DevStackManager
 
         private static int HandleSiteCommand(string[] args)
         {
-            if (args.Length < 1)
+            if (args.Length < 4)
             {
-                Console.WriteLine("Uso: DevStackManager site <dominio> [-root <diretorio>] [-php <php-upstream>] [-nginx <nginx-version>]");
+                Console.WriteLine("Uso: DevStackManager site <dominio> -Root <diretorio> -PHP <php-upstream> -Nginx <nginx-version>");
                 return 1;
             }
 
             string domain = args[0];
-            string? root = null;
-            string? phpUpstream = null;
-            string nginxVersion = string.Empty;
+            string root = "";
+            string phpUpstream = "";
+            string nginxVersion = "";
 
             for (int i = 1; i < args.Length; i++)
             {
-                switch (args[i])
+                switch (args[i].ToLowerInvariant())
                 {
                     case "-root":
-                        if (++i < args.Length) root = args[i];
+                        root = args[i];
                         break;
                     case "-php":
-                        if (++i < args.Length) phpUpstream = $"127.{args[i]}:9000";
+                        phpUpstream = $"127.{args[i]}:9000";
                         break;
                     case "-nginx":
-                        if (++i < args.Length) nginxVersion = args[i];
+                        nginxVersion = args[i];
                         break;
                 }
+            }
+            
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                Console.WriteLine("Erro: domínio é obrigatório.");
+                return 1;
+            }
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                Console.WriteLine("Erro: Root é obrigatório.");
+                return 1;
+            }
+            if (string.IsNullOrWhiteSpace(phpUpstream))
+            {
+                Console.WriteLine("Erro: PHP é obrigatório.");
+                return 1;
+            }
+            if (string.IsNullOrWhiteSpace(nginxVersion))
+            {
+                Console.WriteLine("Erro: Nginx é obrigatório.");
+                return 1;
             }
 
             InstallManager.CreateNginxSiteConfig(domain, root, phpUpstream, nginxVersion);

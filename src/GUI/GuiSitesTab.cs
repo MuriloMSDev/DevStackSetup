@@ -39,8 +39,10 @@ namespace DevStackManager
         /// <summary>
         /// Cria o painel de criação de sites
         /// </summary>
-        private static StackPanel CreateSiteCreationPanel(DevStackGui mainWindow)
+        private static UIElement CreateSiteCreationPanel(DevStackGui mainWindow)
         {
+            // Usar Grid para permitir overlay
+            var grid = new Grid();
             var panel = new StackPanel
             {
                 Margin = new Thickness(10)
@@ -62,7 +64,7 @@ namespace DevStackManager
             panel.Children.Add(domainTextBox);
 
             // Diretório raiz com botão procurar
-            var rootLabel = GuiTheme.CreateStyledLabel("Diretório raiz (opcional):");
+            var rootLabel = GuiTheme.CreateStyledLabel("Diretório raiz:");
             panel.Children.Add(rootLabel);
 
             var rootPanel = new Grid
@@ -130,18 +132,39 @@ namespace DevStackManager
             LoadNginxVersions(nginxComboBox);
             panel.Children.Add(nginxComboBox);
 
+            // Overlay de loading (spinner)
+            var overlay = GuiTheme.CreateLoadingOverlay();
+            // Overlay sempre visível se criando site
+            overlay.Visibility = mainWindow.IsCreatingSite ? Visibility.Visible : Visibility.Collapsed;
+            mainWindow.PropertyChanged += (sender, args) =>
+            {
+                if (args.PropertyName == nameof(mainWindow.IsCreatingSite))
+                {
+                    overlay.Visibility = mainWindow.IsCreatingSite ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
             // Botão Criar Site
             var createButton = GuiTheme.CreateStyledButton("🌐 Criar Configuração de Site", (s, e) =>
             {
-                var domain = domainTextBox.Text.Trim();
-                var root = rootTextBox.Text.Trim();
-                var phpUpstream = phpComboBox.SelectedItem?.ToString() ?? "";
-                var nginxVersion = nginxComboBox.SelectedItem?.ToString() ?? "";
+                mainWindow.IsCreatingSite = true;
+                overlay.Visibility = Visibility.Visible;
+                try
+                {
+                    var domain = domainTextBox.Text.Trim();
+                    var root = rootTextBox.Text.Trim();
+                    var phpUpstream = phpComboBox.SelectedItem?.ToString() ?? "";
+                    var nginxVersion = nginxComboBox.SelectedItem?.ToString() ?? "";
 
-                CreateSite(mainWindow, domain, root, $"127.{phpUpstream}:9000", nginxVersion);
-                
-                phpComboBox.SelectedIndex = -1;
-                nginxComboBox.SelectedIndex = -1;
+                    CreateSite(mainWindow, domain, root, phpUpstream, nginxVersion);
+                    phpComboBox.SelectedIndex = -1;
+                    nginxComboBox.SelectedIndex = -1;
+                }
+                finally
+                {
+                    mainWindow.IsCreatingSite = false;
+                    overlay.Visibility = Visibility.Collapsed;
+                }
             });
             createButton.Height = 40;
             createButton.FontSize = 14;
@@ -167,20 +190,28 @@ namespace DevStackManager
             panel.Children.Add(sslDomainTextBox);
 
             Button? generateSslButton = null;
-            generateSslButton = GuiTheme.CreateStyledButton("🔒 Gerar Certificado SSL", async (s, e) => 
+            generateSslButton = GuiTheme.CreateStyledButton("🔒 Gerar Certificado SSL", async (s, e) =>
             {
+                mainWindow.IsCreatingSite = true;
+                overlay.Visibility = Visibility.Visible;
                 if (generateSslButton != null)
                     generateSslButton.IsEnabled = false;
                 try
                 {
-                    await GenerateSslCertificate(mainWindow, sslDomainTextBox.Text);
+                    var domain = sslDomainTextBox.Text;
+                    await Task.Run(async () =>
+                    {
+                        await GenerateSslCertificate(mainWindow, domain);
+                    });
                     await GuiInstalledTab.LoadInstalledComponents(mainWindow);
-                    sslDomainTextBox.Text = "";
                 }
                 finally
                 {
+                    sslDomainTextBox.Text = "";
                     if (generateSslButton != null)
                         generateSslButton.IsEnabled = true;
+                    overlay.Visibility = Visibility.Collapsed;
+                    mainWindow.IsCreatingSite = false;
                 }
             });
             generateSslButton.Height = 40;
@@ -194,7 +225,11 @@ namespace DevStackManager
             infoLabel.Margin = new Thickness(0, 20, 0, 0);
             panel.Children.Add(infoLabel);
 
-            return panel;
+            // Adiciona painel e overlay ao grid
+            grid.Children.Add(panel);
+            grid.Children.Add(overlay);
+
+            return grid;
         }
 
         /// <summary>
@@ -250,18 +285,36 @@ namespace DevStackManager
         /// <summary>
         /// Cria uma configuração de site Nginx
         /// </summary>
-        private static void CreateSite(DevStackGui mainWindow, string domain, string root, string phpUpstream, string nginxVersion = "")
+        private static void CreateSite(DevStackGui mainWindow, string domain, string root, string phpUpstream, string nginxVersion)
         {
             if (string.IsNullOrEmpty(domain))
             {
-                MessageBox.Show("Digite um domínio para o site.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                GuiTheme.CreateStyledMessageBox("Digite um domínio para o site.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(root))
+            {
+                GuiTheme.CreateStyledMessageBox("Digite um diretório raiz para o site.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(phpUpstream))
+            {
+                GuiTheme.CreateStyledMessageBox("Selecione uma versão do PHP para o site.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(nginxVersion))
+            {
+                GuiTheme.CreateStyledMessageBox("Selecione uma versão do Nginx para o site.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             try
             {
                 mainWindow.StatusMessage = $"Criando configuração para o site {domain}...";
-                InstallManager.CreateNginxSiteConfig(domain, root, phpUpstream, nginxVersion);
+                InstallManager.CreateNginxSiteConfig(domain, root, $"127.{phpUpstream}:9000", nginxVersion);
                 
                 // Reiniciar serviços do Nginx após criar a configuração
                 mainWindow.StatusMessage = $"Reiniciando serviços do Nginx...";
@@ -279,7 +332,7 @@ namespace DevStackManager
             {
                 GuiConsolePanel.AppendToConsole(mainWindow, $"❌ Erro ao criar site {domain}: {ex.Message}");
                 mainWindow.StatusMessage = $"Erro ao criar site {domain}";
-                MessageBox.Show($"Erro ao criar configuração do site: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                GuiTheme.CreateStyledMessageBox($"Erro ao criar configuração do site: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -290,7 +343,38 @@ namespace DevStackManager
         {
             if (string.IsNullOrEmpty(domain))
             {
-                MessageBox.Show("Digite um domínio para gerar o certificado SSL.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    GuiTheme.CreateStyledMessageBox("Digite um domínio para gerar o certificado SSL.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+                return;
+            }
+
+            // Validação extra: checar se o domínio existe (resolve DNS) em thread separada
+            bool domainResolves = false;
+            try
+            {
+                domainResolves = await Task.Run(() =>
+                {
+                    try
+                    {
+                        var hostEntry = System.Net.Dns.GetHostEntry(domain);
+                        return hostEntry != null && hostEntry.AddressList.Length > 0;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+            }
+            catch { domainResolves = false; }
+
+            if (!domainResolves)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    GuiTheme.CreateStyledMessageBox($"O domínio '{domain}' não existe ou não está resolvendo para nenhum IP.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
                 return;
             }
 
@@ -307,7 +391,7 @@ namespace DevStackManager
             {
                 GuiConsolePanel.AppendToConsole(mainWindow, $"❌ Erro ao gerar certificado SSL: {ex.Message}");
                 mainWindow.StatusMessage = $"Erro ao gerar SSL para {domain}";
-                MessageBox.Show($"Erro ao gerar certificado SSL: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                GuiTheme.CreateStyledMessageBox($"Erro ao gerar certificado SSL: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

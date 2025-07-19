@@ -45,8 +45,10 @@ namespace DevStackManager
         /// <summary>
         /// Cria o painel de seleção de componentes para desinstalação
         /// </summary>
-        private static StackPanel CreateUninstallSelectionPanel(DevStackGui mainWindow)
+        private static UIElement CreateUninstallSelectionPanel(DevStackGui mainWindow)
         {
+            // Usar Grid para permitir overlay
+            var grid = new Grid();
             var panel = new StackPanel
             {
                 Margin = new Thickness(10)
@@ -84,8 +86,33 @@ namespace DevStackManager
             versionCombo.SetBinding(ComboBox.SelectedValueProperty, selectedUninstallVersionBinding);
             panel.Children.Add(versionCombo);
 
+            // Overlay de loading (spinner)
+            var overlay = GuiTheme.CreateLoadingOverlay();
+            // Overlay sempre visível se desinstalando
+            overlay.Visibility = mainWindow.IsUninstallingComponent ? Visibility.Visible : Visibility.Collapsed;
+            mainWindow.PropertyChanged += (sender, args) =>
+            {
+                if (args.PropertyName == nameof(mainWindow.IsUninstallingComponent))
+                {
+                    overlay.Visibility = mainWindow.IsUninstallingComponent ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
             // Botão Desinstalar
-            var uninstallButton = GuiTheme.CreateStyledButton("🗑️ Desinstalar", async (s, e) => await UninstallComponent(mainWindow));
+            var uninstallButton = GuiTheme.CreateStyledButton("🗑️ Desinstalar", async (s, e) =>
+            {
+                mainWindow.IsUninstallingComponent = true;
+                overlay.Visibility = Visibility.Visible;
+                try
+                {
+                    await UninstallComponent(mainWindow);
+                }
+                finally
+                {
+                    mainWindow.IsUninstallingComponent = false;
+                    overlay.Visibility = Visibility.Collapsed;
+                }
+            });
             uninstallButton.Height = 40;
             uninstallButton.FontSize = 14;
             uninstallButton.Margin = new Thickness(0, 10, 0, 0);
@@ -104,7 +131,11 @@ namespace DevStackManager
             warningLabel.Margin = new Thickness(0, 20, 0, 0);
             panel.Children.Add(warningLabel);
 
-            return panel;
+            // Adiciona painel e overlay ao grid
+            grid.Children.Add(panel);
+            grid.Children.Add(overlay);
+
+            return grid;
         }
 
         /// <summary>
@@ -114,20 +145,25 @@ namespace DevStackManager
         {
             if (string.IsNullOrEmpty(mainWindow.SelectedUninstallComponent))
             {
-                MessageBox.Show("Selecione um componente para desinstalar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                GuiTheme.CreateStyledMessageBox("Selecione um componente para desinstalar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var result = MessageBox.Show(
+            if (string.IsNullOrEmpty(mainWindow.SelectedUninstallVersion))
+            {
+                GuiTheme.CreateStyledMessageBox("Selecione uma versão para desinstalar.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = GuiTheme.CreateStyledMessageBox(
                 $"Tem certeza que deseja desinstalar {mainWindow.SelectedUninstallComponent}?",
                 "Confirmação",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                MessageBoxImage.Warning);
 
             if (result != MessageBoxResult.Yes)
                 return;
 
-            mainWindow.IsLoading = true;
             mainWindow.StatusMessage = $"Desinstalando {mainWindow.SelectedUninstallComponent}...";
             
             try
@@ -151,10 +187,6 @@ namespace DevStackManager
                 GuiConsolePanel.AppendToConsole(mainWindow, $"❌ Erro ao desinstalar {mainWindow.SelectedUninstallComponent}: {ex.Message}");
                 mainWindow.StatusMessage = $"Erro ao desinstalar {mainWindow.SelectedUninstallComponent}";
                 DevStackConfig.WriteLog($"Erro ao desinstalar {mainWindow.SelectedUninstallComponent} na GUI: {ex}");
-            }
-            finally
-            {
-                mainWindow.IsLoading = false;
             }
         }
 
@@ -213,7 +245,7 @@ namespace DevStackManager
                             }
                             else
                             {
-                                MessageBox.Show($"{mainWindow.SelectedUninstallComponent} não possui versões instaladas.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
+                                GuiTheme.CreateStyledMessageBox($"{mainWindow.SelectedUninstallComponent} não possui versões instaladas.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Information);
                             }
                         }
                         mainWindow.StatusMessage = status.Installed ?

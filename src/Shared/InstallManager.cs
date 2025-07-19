@@ -35,13 +35,8 @@ namespace DevStackManager
             }
         }
 
-        public static void CreateNginxSiteConfig(string domain, string? root, string? phpUpstream, string nginxVersion)
+        public static void CreateNginxSiteConfig(string domain, string root, string phpUpstream, string nginxVersion)
         {
-            if (string.IsNullOrEmpty(nginxVersion))
-            {
-                throw new ArgumentNullException(nameof(nginxVersion), "nginxVersion não pode ser nulo ou vazio.");
-            }
-            
             string nginxVersionDir = Path.Combine(DevStackConfig.nginxDir, $"nginx-{nginxVersion}");
             string nginxSitesDirFull = Path.Combine(nginxVersionDir, DevStackConfig.nginxSitesDir);
 
@@ -55,16 +50,8 @@ namespace DevStackManager
                 Directory.CreateDirectory(nginxSitesDirFull);
             }
 
-            phpUpstream ??= "127.0.0.1:9000";
-
-            if (string.IsNullOrEmpty(root) && Directory.Exists(Path.Combine("C:", "Workspace", domain)))
-            {
-                root = Path.Combine("C:", "Workspace", domain);
-            }
-
             string confPath = Path.Combine(nginxSitesDirFull, $"{domain}.conf");
             string serverName = $"{domain}.localhost";
-            string rootPath = root ?? "";
 
             string template = $@"server {{
 
@@ -72,7 +59,7 @@ namespace DevStackManager
     listen [::]:80;
 
     server_name {serverName};
-    root {rootPath};
+    root {root};
     index index.php index.html index.htm;
 
     location / {{
